@@ -1,0 +1,83 @@
+image: node:18-bullseye
+
+stages:
+  - install
+  - test
+  - e2e
+
+variables:
+  NODE_ENV: test
+  NPM_CONFIG_LOGLEVEL: warn
+
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - node_modules/
+
+before_script:
+  - npm ci
+
+install_job:
+  stage: install
+  script:
+    - npm ci
+  artifacts:
+    paths:
+      - node_modules/
+    expire_in: 1h
+
+unit_tests:
+  stage: test
+  script:
+    - JEST_JUNIT_OUTPUT=junit.xml npm run test:ci --silent
+  artifacts:
+    when: always
+    paths:
+      - coverage/
+      - junit.xml
+    reports:
+      junit: junit.xml
+
+e2e_tests:
+  stage: e2e
+  image: mcr.microsoft.com/playwright:focal
+  script:
+    - npm ci
+    - npx playwright install --with-deps
+    - npm run e2e
+  artifacts:
+    when: always
+    paths:
+      - playwright-report/
+  needs:
+    - unit_tests
+
+unit_tests_self_hosted:
+  stage: test
+  tags:
+    - self-hosted
+  script:
+    - JEST_JUNIT_OUTPUT=junit.xml npm run test:ci --silent
+  artifacts:
+    when: always
+    paths:
+      - coverage/
+      - junit.xml
+    reports:
+      junit: junit.xml
+
+e2e_tests_self_hosted:
+  stage: e2e
+  tags:
+    - self-hosted
+  image: mcr.microsoft.com/playwright:focal
+  script:
+    - npm ci
+    - npx playwright install --with-deps
+    - npm run e2e
+  artifacts:
+    when: always
+    paths:
+      - playwright-report/
+  needs:
+    - unit_tests_self_hosted
